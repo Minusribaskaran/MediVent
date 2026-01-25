@@ -37,7 +37,7 @@ interface RazorpayInstance {
 }
 
 // Razorpay Test Key (publishable - safe to store in code)
-export const RAZORPAY_TEST_KEY = "rzp_test_1234567890abcdef";
+export const RAZORPAY_TEST_KEY = "rzp_test_S7yxaRhqSyt32a";
 
 export function loadRazorpayScript(): Promise<boolean> {
   return new Promise((resolve) => {
