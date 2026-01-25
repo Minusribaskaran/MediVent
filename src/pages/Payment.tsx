@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { CheckCircle, CreditCard, ArrowLeft, Loader2, Smartphone, AlertCircle } from "lucide-react";
+import { CheckCircle, CreditCard, ArrowLeft, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { initiateRazorpayPayment, loadRazorpayScript, RazorpayResponse } from "@/hooks/useRazorpay";
@@ -9,7 +9,9 @@ export default function Payment() {
   const location = useLocation();
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isDispensing, setIsDispensing] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [isFailed, setIsFailed] = useState(false);
   const [paymentId, setPaymentId] = useState<string>("");
   const [sdkLoaded, setSdkLoaded] = useState(false);
   const [sdkError, setSdkError] = useState(false);
@@ -42,23 +44,21 @@ export default function Payment() {
       await initiateRazorpayPayment(
         amount,
         (response: RazorpayResponse) => {
-          // Payment successful
+          // Payment successful - show dispensing first
           setPaymentId(response.razorpay_payment_id);
           setIsProcessing(false);
-          setIsComplete(true);
-          toast({
-            title: "Payment Successful!",
-            description: `Transaction ID: ${response.razorpay_payment_id}`,
-          });
+          setIsDispensing(true);
+          
+          // After 3 seconds, show thank you
+          setTimeout(() => {
+            setIsDispensing(false);
+            setIsComplete(true);
+          }, 3000);
         },
         () => {
-          // Payment dismissed
+          // Payment dismissed/failed
           setIsProcessing(false);
-          toast({
-            title: "Payment Cancelled",
-            description: "You can try again when ready.",
-            variant: "destructive",
-          });
+          setIsFailed(true);
         }
       );
     } catch (error) {
@@ -71,10 +71,40 @@ export default function Payment() {
     }
   };
 
+  // Dispensing state
+  if (isDispensing) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="bg-[image:var(--gradient-header)] px-6 py-4">
+          <h1 className="text-2xl font-bold text-primary-foreground text-center">
+            MediVend
+          </h1>
+        </header>
+
+        <main className="flex-1 flex items-center justify-center p-6">
+          <div className="text-center">
+            <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
+              <Loader2 className="w-14 h-14 text-primary animate-spin" />
+            </div>
+            <h2 className="text-3xl font-bold text-foreground mb-2">Dispensing Your Medicines</h2>
+            <p className="text-muted-foreground text-lg mb-4">
+              Please wait while we prepare your order...
+            </p>
+            <div className="flex justify-center gap-2 mt-6">
+              <div className="w-3 h-3 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-3 h-3 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-3 h-3 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Payment complete - Thank You
   if (isComplete) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        {/* Header */}
         <header className="bg-[image:var(--gradient-header)] px-6 py-4">
           <h1 className="text-2xl font-bold text-primary-foreground text-center">
             MediVend
@@ -86,9 +116,9 @@ export default function Payment() {
             <div className="w-24 h-24 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-6 animate-pulse-glow">
               <CheckCircle className="w-14 h-14 text-accent" />
             </div>
-            <h2 className="text-3xl font-bold text-foreground mb-2">Payment Successful!</h2>
+            <h2 className="text-3xl font-bold text-foreground mb-2">Thank You!</h2>
             <p className="text-muted-foreground text-lg mb-4">
-              Your medicines will be dispensed shortly.
+              Your medicines have been dispensed. Please collect them below.
             </p>
             <p className="text-5xl font-bold text-primary mb-4">₹{amount}</p>
             {paymentId && (
@@ -104,6 +134,52 @@ export default function Payment() {
               <ArrowLeft className="w-5 h-5 mr-2" />
               Back to Scanner
             </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Payment failed state
+  if (isFailed) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="bg-[image:var(--gradient-header)] px-6 py-4">
+          <h1 className="text-2xl font-bold text-primary-foreground text-center">
+            MediVend
+          </h1>
+        </header>
+
+        <main className="flex-1 flex items-center justify-center p-6">
+          <div className="text-center">
+            <div className="w-24 h-24 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-6">
+              <AlertCircle className="w-14 h-14 text-destructive" />
+            </div>
+            <h2 className="text-3xl font-bold text-foreground mb-2">Payment Failed</h2>
+            <p className="text-muted-foreground text-lg mb-8">
+              Your payment could not be processed. Please try again.
+            </p>
+            <div className="flex flex-col gap-4">
+              <Button
+                onClick={() => {
+                  setIsFailed(false);
+                  handlePayment();
+                }}
+                size="lg"
+                className="h-14 px-8 text-lg font-semibold shadow-button"
+              >
+                Retry Payment
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate("/")}
+                size="lg"
+                className="h-14 px-8 text-lg font-semibold"
+              >
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Back to Scanner
+              </Button>
+            </div>
           </div>
         </main>
       </div>
@@ -142,28 +218,6 @@ export default function Payment() {
             <div className="bg-secondary rounded-xl p-6 text-center mb-8">
               <p className="text-muted-foreground text-sm mb-1">Amount to Pay</p>
               <p className="text-4xl font-bold text-primary">₹{amount}</p>
-            </div>
-
-            {/* Payment Methods Info */}
-            <div className="space-y-3 mb-8">
-              <div className="flex items-center gap-3 p-4 bg-secondary/50 rounded-xl">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Smartphone className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <span className="font-medium block">UPI Payment</span>
-                  <span className="text-sm text-muted-foreground">GPay, PhonePe, Paytm & more</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-4 bg-secondary/50 rounded-xl">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <CreditCard className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <span className="font-medium block">Card Payment</span>
-                  <span className="text-sm text-muted-foreground">Visa, Mastercard, RuPay</span>
-                </div>
-              </div>
             </div>
 
             {sdkError && (
