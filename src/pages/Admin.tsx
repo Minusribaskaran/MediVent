@@ -20,7 +20,7 @@ import {
   Lock,
 } from "lucide-react";
 
-const ADMIN_PASSWORD = "admin123"; // Simple demo password
+const ADMIN_PASSWORD = "project";
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -122,9 +122,6 @@ export default function Admin() {
                 </Button>
               </form>
 
-              <p className="text-xs text-muted-foreground text-center mt-4">
-                Demo password: admin123
-              </p>
             </div>
           </div>
         </main>

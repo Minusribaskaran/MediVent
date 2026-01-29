@@ -2,12 +2,13 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { QRScanner } from "@/components/QRScanner";
 import { MedicineSummary } from "@/components/MedicineSummary";
-import { parseQRData, calculateMedicineDetails, MedicineWithPrice, MEDICINE_PRICES } from "@/lib/medicineData";
+import { PartialStockSelector, PartialStockItem } from "@/components/PartialStockSelector";
+import { parseQRData, calculateMedicineDetails, MedicineWithPrice, MEDICINE_PRICES, getMedicinePrice } from "@/lib/medicineData";
 import { initializeInventory, getAvailableMedicines, isMedicineAvailable, getMedicineStock } from "@/lib/inventoryService";
 import { Pill, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-type ViewState = "scanner" | "summary" | "error";
+type ViewState = "scanner" | "summary" | "partial-stock" | "error";
 
 export default function Index() {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ export default function Index() {
   const [unknownMedicines, setUnknownMedicines] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [availableMedicines, setAvailableMedicines] = useState<string[]>([]);
+  const [partialStockItems, setPartialStockItems] = useState<PartialStockItem[]>([]);
 
   // Initialize inventory and get available medicines
   useEffect(() => {
@@ -37,33 +39,84 @@ export default function Index() {
       return;
     }
 
-    // Filter medicines based on availability (stock > 0)
-    const availableInStock = qrData.medicines.filter((med) => {
-      const isAvail = isMedicineAvailable(med.name);
-      const stock = getMedicineStock(med.name);
-      // Check if we have enough stock for requested quantity
-      return isAvail && stock >= med.qty;
-    });
+    const fullyAvailable: { name: string; qty: number }[] = [];
+    const partiallyAvailable: PartialStockItem[] = [];
+    const outOfStockNames: string[] = [];
+    const unknownNames: string[] = [];
 
-    // Medicines that are out of stock or insufficient stock
-    const outOfStock = qrData.medicines.filter((med) => {
+    for (const med of qrData.medicines) {
+      const price = getMedicinePrice(med.name);
       const stock = getMedicineStock(med.name);
-      return stock < med.qty;
-    });
 
-    const result = calculateMedicineDetails(availableInStock);
-    
-    // Add out-of-stock medicines to unknown list
-    const outOfStockNames = outOfStock.map((m) => `${m.name} (out of stock)`);
-    
+      if (price === null) {
+        // Medicine not in our catalog
+        unknownNames.push(med.name);
+      } else if (stock === 0) {
+        // Completely out of stock
+        outOfStockNames.push(`${med.name} (out of stock)`);
+      } else if (stock < med.qty) {
+        // Partial stock available - let user choose
+        partiallyAvailable.push({
+          name: med.name,
+          qty: stock, // Default to available stock
+          requestedQty: med.qty,
+          availableStock: stock,
+          pricePerUnit: price,
+          totalPrice: stock * price,
+          selected: true, // Pre-selected
+        });
+      } else {
+        // Full stock available
+        fullyAvailable.push(med);
+      }
+    }
+
+    // If there are partial stock items, show the selector
+    if (partiallyAvailable.length > 0) {
+      // Also include fully available items in the selector for consistency
+      const allItems: PartialStockItem[] = [
+        ...fullyAvailable.map((med) => {
+          const price = getMedicinePrice(med.name) || 0;
+          return {
+            name: med.name,
+            qty: med.qty,
+            requestedQty: med.qty,
+            availableStock: getMedicineStock(med.name),
+            pricePerUnit: price,
+            totalPrice: med.qty * price,
+            selected: true,
+          };
+        }),
+        ...partiallyAvailable,
+      ];
+      
+      setPartialStockItems(allItems);
+      setUnknownMedicines([...unknownNames, ...outOfStockNames]);
+      setView("partial-stock");
+      return;
+    }
+
+    // No partial stock issues - proceed normally
+    const result = calculateMedicineDetails(fullyAvailable);
     setItems(result.items);
     setGrandTotal(result.grandTotal);
-    setUnknownMedicines([...result.unknownMedicines, ...outOfStockNames]);
+    setUnknownMedicines([...result.unknownMedicines, ...unknownNames, ...outOfStockNames]);
+    setView("summary");
+  };
+
+  const handlePartialStockConfirm = (selectedItems: MedicineWithPrice[]) => {
+    if (selectedItems.length === 0) {
+      handleCancel();
+      return;
+    }
+    
+    const total = selectedItems.reduce((sum, item) => sum + item.totalPrice, 0);
+    setItems(selectedItems);
+    setGrandTotal(total);
     setView("summary");
   };
 
   const handleConfirm = () => {
-    // Pass medicine items to payment for stock decrement after success
     navigate("/payment", { state: { amount: grandTotal, items } });
   };
 
@@ -73,6 +126,7 @@ export default function Index() {
     setItems([]);
     setGrandTotal(0);
     setUnknownMedicines([]);
+    setPartialStockItems([]);
   };
 
   return (
@@ -97,6 +151,14 @@ export default function Index() {
             </p>
             <QRScanner onScan={handleQRScan} />
           </div>
+        )}
+
+        {view === "partial-stock" && (
+          <PartialStockSelector
+            items={partialStockItems}
+            onConfirm={handlePartialStockConfirm}
+            onCancel={handleCancel}
+          />
         )}
 
         {view === "summary" && (
