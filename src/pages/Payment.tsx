@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { initiateRazorpayPayment, loadRazorpayScript, RazorpayResponse } from "@/hooks/useRazorpay";
 import { toast } from "@/hooks/use-toast";
+import { decrementMultipleStock } from "@/lib/inventoryService";
+import { MedicineWithPrice } from "@/lib/medicineData";
 
 export default function Payment() {
   const location = useLocation();
@@ -17,6 +19,7 @@ export default function Payment() {
   const [sdkError, setSdkError] = useState(false);
 
   const amount = location.state?.amount || 0;
+  const items: MedicineWithPrice[] = location.state?.items || [];
 
   // Preload Razorpay SDK
   useEffect(() => {
@@ -44,7 +47,14 @@ export default function Payment() {
       await initiateRazorpayPayment(
         amount,
         (response: RazorpayResponse) => {
-          // Payment successful - show dispensing first
+          // Payment successful - decrement stock
+          const stockItems = items.map((item) => ({
+            name: item.name,
+            qty: item.qty,
+          }));
+          decrementMultipleStock(stockItems);
+          
+          // Show dispensing first
           setPaymentId(response.razorpay_payment_id);
           setIsProcessing(false);
           setIsDispensing(true);
