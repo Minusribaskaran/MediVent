@@ -153,6 +153,14 @@ export default function Index() {
           </div>
         )}
 
+        {view === "partial-stock" && (
+          <PartialStockSelector
+            items={partialStockItems}
+            onConfirm={handlePartialStockConfirm}
+            onCancel={handleCancel}
+          />
+        )}
+
         {view === "summary" && (
           <MedicineSummary
             items={items}
