@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { QRScanner } from "@/components/QRScanner";
 import { MedicineSummary } from "@/components/MedicineSummary";
-import { parseQRData, calculateMedicineDetails, MedicineWithPrice } from "@/lib/medicineData";
+import { parseQRData, calculateMedicineDetails, MedicineWithPrice, MEDICINE_PRICES } from "@/lib/medicineData";
+import { initializeInventory, getAvailableMedicines, isMedicineAvailable, getMedicineStock } from "@/lib/inventoryService";
 import { Pill, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -15,6 +16,17 @@ export default function Index() {
   const [grandTotal, setGrandTotal] = useState(0);
   const [unknownMedicines, setUnknownMedicines] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
+  const [availableMedicines, setAvailableMedicines] = useState<string[]>([]);
+
+  // Initialize inventory and get available medicines
+  useEffect(() => {
+    initializeInventory();
+    updateAvailableMedicines();
+  }, []);
+
+  const updateAvailableMedicines = () => {
+    setAvailableMedicines(getAvailableMedicines());
+  };
 
   const handleQRScan = (data: string) => {
     const qrData = parseQRData(data);
@@ -25,18 +37,38 @@ export default function Index() {
       return;
     }
 
-    const result = calculateMedicineDetails(qrData.medicines);
+    // Filter medicines based on availability (stock > 0)
+    const availableInStock = qrData.medicines.filter((med) => {
+      const isAvail = isMedicineAvailable(med.name);
+      const stock = getMedicineStock(med.name);
+      // Check if we have enough stock for requested quantity
+      return isAvail && stock >= med.qty;
+    });
+
+    // Medicines that are out of stock or insufficient stock
+    const outOfStock = qrData.medicines.filter((med) => {
+      const stock = getMedicineStock(med.name);
+      return stock < med.qty;
+    });
+
+    const result = calculateMedicineDetails(availableInStock);
+    
+    // Add out-of-stock medicines to unknown list
+    const outOfStockNames = outOfStock.map((m) => `${m.name} (out of stock)`);
+    
     setItems(result.items);
     setGrandTotal(result.grandTotal);
-    setUnknownMedicines(result.unknownMedicines);
+    setUnknownMedicines([...result.unknownMedicines, ...outOfStockNames]);
     setView("summary");
   };
 
   const handleConfirm = () => {
-    navigate("/payment", { state: { amount: grandTotal } });
+    // Pass medicine items to payment for stock decrement after success
+    navigate("/payment", { state: { amount: grandTotal, items } });
   };
 
   const handleCancel = () => {
+    updateAvailableMedicines();
     setView("scanner");
     setItems([]);
     setGrandTotal(0);
@@ -100,7 +132,9 @@ export default function Index() {
       {/* Footer */}
       <footer className="px-6 py-4 text-center">
         <p className="text-sm text-muted-foreground">
-          Available: Paracetamol (₹20) • Amoxicillin (₹50) • Cetirizine (₹10)
+          Available: {availableMedicines.length > 0 
+            ? availableMedicines.map((name) => `${name} (₹${MEDICINE_PRICES[name]})`).join(" • ")
+            : "No medicines in stock"}
         </p>
       </footer>
     </div>
