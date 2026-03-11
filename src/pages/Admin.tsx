@@ -154,8 +154,8 @@ export default function Admin() {
 
       <main className="flex-1 p-6">
         <div className="max-w-lg mx-auto space-y-6">
-          {/* Notifications */}
-          {notifications.length > 0 && (
+          {/* Stock Alerts & Refill - Shows when ANY medicine is at 0 stock */}
+          {hasEmptyStock && (
             <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full bg-destructive/20 flex items-center justify-center">
@@ -166,29 +166,28 @@ export default function Admin() {
                     Stock Alert!
                   </h2>
                   <p className="text-destructive/80 text-sm">
-                    {notifications.length} medicine(s) out of stock
+                    {emptyMedicines.length} medicine(s) out of stock
                   </p>
                 </div>
               </div>
 
               <div className="space-y-3">
-                {notifications.map((notification) => (
+                {emptyMedicines.map((item) => (
                   <div
-                    key={notification.id}
+                    key={item.name}
                     className="bg-card rounded-xl p-4 flex items-center justify-between"
                   >
                     <div>
                       <p className="font-semibold text-foreground">
-                        {notification.medicineName}
+                        {item.name}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        Empty since{" "}
-                        {new Date(notification.timestamp).toLocaleTimeString()}
+                        Out of stock
                       </p>
                     </div>
                     <Button
                       size="sm"
-                      onClick={() => handleRefillEmpty(notification.medicineName)}
+                      onClick={() => handleRefillEmpty(item.name)}
                       className="bg-accent hover:bg-accent/90"
                     >
                       <RefreshCw className="w-4 h-4 mr-1" />
@@ -221,19 +220,17 @@ export default function Admin() {
               {inventory.map((item) => (
                 <div
                   key={item.name}
-                  className={`flex items-center justify-between p-4 rounded-xl ${
-                    item.stock === 0
-                      ? "bg-destructive/10 border border-destructive/20"
-                      : "bg-secondary"
-                  }`}
+                  className={`flex items-center justify-between p-4 rounded-xl ${item.stock === 0
+                    ? "bg-destructive/10 border border-destructive/20"
+                    : "bg-secondary"
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        item.stock === 0
-                          ? "bg-destructive/20"
-                          : "bg-primary/10"
-                      }`}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center ${item.stock === 0
+                        ? "bg-destructive/20"
+                        : "bg-primary/10"
+                        }`}
                     >
                       {item.stock === 0 ? (
                         <AlertTriangle className="w-5 h-5 text-destructive" />
@@ -252,9 +249,8 @@ export default function Admin() {
                   </div>
                   <div className="text-right">
                     <p
-                      className={`text-2xl font-bold ${
-                        item.stock === 0 ? "text-destructive" : "text-foreground"
-                      }`}
+                      className={`text-2xl font-bold ${item.stock === 0 ? "text-destructive" : "text-foreground"
+                        }`}
                     >
                       {item.stock}
                     </p>
@@ -276,6 +272,15 @@ export default function Admin() {
               </div>
             )}
           </div>
+
+          {/* Refill All - Always visible */}
+          <Button
+            onClick={handleRefillAll}
+            className="w-full h-12 font-semibold bg-accent hover:bg-accent/90"
+          >
+            <RefreshCw className="w-5 h-5 mr-2" />
+            Refill All Medicines
+          </Button>
 
           {/* Manual Refresh */}
           <Button

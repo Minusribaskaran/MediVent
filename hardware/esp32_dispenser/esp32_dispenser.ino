@@ -64,6 +64,11 @@ const int NORMAL_SPEED = 120;       // ~47% - Standard dispensing (was 180)
 const int FAST_SPEED = 150;         // ~60% - Maximum recommended
 const int MIN_SPEED = 0;            // Starting speed
 
+// Per-slot speed overrides (adjust individually if a slot needs different speed)
+int speedSlot1 = 120;               // Paracetamol - normal speed
+int speedSlot2 = 120;               // Amoxicillin - normal speed
+int speedSlot3 = 80;                // Cetirizine  - SLOWER (loose actuator fit)
+
 // Timing configuration - TUNED for ONE spring rotation
 int rampUpTimeMs = 300;             // Soft acceleration (adjustable)
 int runTimeMs = 500;                // Main dispense time (CRITICAL - tune this!)
@@ -463,6 +468,14 @@ void runMotor(int channel, int duration) {
   delay(duration);
 }
 
+// Get the per-slot speed for a medicine
+int getSlotSpeed(const char* medicineName) {
+  if (strcmp(medicineName, "Paracetamol") == 0) return speedSlot1;
+  if (strcmp(medicineName, "Amoxicillin") == 0) return speedSlot2;
+  if (strcmp(medicineName, "Cetirizine") == 0)  return speedSlot3;
+  return targetSpeed;  // fallback to global
+}
+
 // Dispense tablets for a specific medicine with SMOOTH MOTOR CONTROL
 int dispenseMedicine(const char* medicineName, int count) {
   int pin = getMedicinePin(medicineName);
@@ -474,6 +487,10 @@ int dispenseMedicine(const char* medicineName, int count) {
     return 0;
   }
   
+  // Use per-slot speed (saves & restores global targetSpeed)
+  int savedSpeed = targetSpeed;
+  targetSpeed = getSlotSpeed(medicineName);
+  
   Serial.println();
   Serial.print("[SLOT] Dispensing ");
   Serial.print(medicineName);
@@ -482,6 +499,11 @@ int dispenseMedicine(const char* medicineName, int count) {
   Serial.print(" (PWM Channel ");
   Serial.print(channel);
   Serial.println(")");
+  Serial.print("[SLOT] Speed: ");
+  Serial.print(targetSpeed);
+  Serial.print(" (");
+  Serial.print((targetSpeed * 100) / 255);
+  Serial.println("%)");
   Serial.println("[SLOT] Using SMOOTH motor control (anti-vibration)");
   
   int dispensed = 0;
@@ -508,6 +530,9 @@ int dispenseMedicine(const char* medicineName, int count) {
     
     dispensed++;
   }
+  
+  // Restore global speed
+  targetSpeed = savedSpeed;
   
   Serial.print("[SLOT] ");
   Serial.print(medicineName);
