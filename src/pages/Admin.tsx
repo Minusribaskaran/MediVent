@@ -7,6 +7,7 @@ import {
   refillAllMedicines,
   InventoryItem,
   AdminNotification,
+  MAX_STOCK,
 } from "@/lib/inventoryService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,10 @@ export default function Admin() {
   const [error, setError] = useState("");
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  // Per-medicine refill quantities (keyed by medicine name)
+  const [refillQuantities, setRefillQuantities] = useState<Record<string, number>>({});
+  // Bulk refill quantity for "Refill All"
+  const [bulkRefillQty, setBulkRefillQty] = useState(MAX_STOCK);
 
   const refreshData = () => {
     setInventory(getInventory());
@@ -54,13 +59,22 @@ export default function Admin() {
     }
   };
 
+  const getRefillQty = (name: string) => {
+    return refillQuantities[name] ?? MAX_STOCK;
+  };
+
+  const setRefillQty = (name: string, qty: number) => {
+    const clamped = Math.max(0, Math.min(MAX_STOCK, qty));
+    setRefillQuantities((prev) => ({ ...prev, [name]: clamped }));
+  };
+
   const handleRefillEmpty = (medicineName: string) => {
-    refillMedicine(medicineName);
+    refillMedicine(medicineName, getRefillQty(medicineName));
     refreshData();
   };
 
   const handleRefillAll = () => {
-    refillAllMedicines();
+    refillAllMedicines(bulkRefillQty);
     refreshData();
   };
 
@@ -175,35 +189,59 @@ export default function Admin() {
                 {emptyMedicines.map((item) => (
                   <div
                     key={item.name}
-                    className="bg-card rounded-xl p-4 flex items-center justify-between"
+                    className="bg-card rounded-xl p-4"
                   >
-                    <div>
-                      <p className="font-semibold text-foreground">
-                        {item.name}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Out of stock
-                      </p>
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="font-semibold text-foreground">
+                          {item.name}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Out of stock
+                        </p>
+                      </div>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => handleRefillEmpty(item.name)}
-                      className="bg-accent hover:bg-accent/90"
-                    >
-                      <RefreshCw className="w-4 h-4 mr-1" />
-                      Refilled Empty Medicine
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-muted-foreground whitespace-nowrap">Qty:</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={MAX_STOCK}
+                        value={getRefillQty(item.name)}
+                        onChange={(e) => setRefillQty(item.name, parseInt(e.target.value) || 0)}
+                        className="w-20 h-9 text-center"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => handleRefillEmpty(item.name)}
+                        className="bg-accent hover:bg-accent/90 flex-1"
+                      >
+                        <RefreshCw className="w-4 h-4 mr-1" />
+                        Refill {item.name}
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
 
-              <Button
-                onClick={handleRefillAll}
-                className="w-full mt-4 h-12 font-semibold"
-              >
-                <RefreshCw className="w-5 h-5 mr-2" />
-                Refilled All Medicines
-              </Button>
+              <div className="mt-4 flex items-center gap-2">
+                <label className="text-sm text-muted-foreground whitespace-nowrap">Qty:</label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={MAX_STOCK}
+                  value={bulkRefillQty}
+                  onChange={(e) => setBulkRefillQty(Math.max(0, Math.min(MAX_STOCK, parseInt(e.target.value) || 0)))}
+                  className="w-20 h-12 text-center"
+                />
+                <Button
+                  onClick={handleRefillAll}
+                  className="flex-1 h-12 font-semibold"
+                >
+                  <RefreshCw className="w-5 h-5 mr-2" />
+                  Refill All Medicines
+                </Button>
+              </div>
             </div>
           )}
 
@@ -274,13 +312,24 @@ export default function Admin() {
           </div>
 
           {/* Refill All - Always visible */}
-          <Button
-            onClick={handleRefillAll}
-            className="w-full h-12 font-semibold bg-accent hover:bg-accent/90"
-          >
-            <RefreshCw className="w-5 h-5 mr-2" />
-            Refill All Medicines
-          </Button>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-muted-foreground whitespace-nowrap">Qty:</label>
+            <Input
+              type="number"
+              min={0}
+              max={MAX_STOCK}
+              value={bulkRefillQty}
+              onChange={(e) => setBulkRefillQty(Math.max(0, Math.min(MAX_STOCK, parseInt(e.target.value) || 0)))}
+              className="w-20 h-12 text-center"
+            />
+            <Button
+              onClick={handleRefillAll}
+              className="flex-1 h-12 font-semibold bg-accent hover:bg-accent/90"
+            >
+              <RefreshCw className="w-5 h-5 mr-2" />
+              Refill All Medicines
+            </Button>
+          </div>
 
           {/* Manual Refresh */}
           <Button

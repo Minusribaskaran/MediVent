@@ -143,34 +143,45 @@ function createNotification(medicineName: string): void {
   localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(notifications));
 }
 
-// Refill a specific medicine (sets stock back to 5)
-export function refillMedicine(medicineName: string): void {
+// Refill a specific medicine with a custom quantity (0 to MAX_STOCK)
+export const MAX_STOCK = INITIAL_STOCK;
+
+export function refillMedicine(medicineName: string, quantity: number = INITIAL_STOCK): void {
   const inventory = getInventory();
   const item = inventory.find((i) => i.name === medicineName);
 
+  // Clamp quantity between 0 and MAX_STOCK
+  const clampedQty = Math.max(0, Math.min(MAX_STOCK, quantity));
+
   if (item) {
-    item.stock = INITIAL_STOCK;
+    item.stock = clampedQty;
     localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventory));
   }
 
-  // Acknowledge related notifications
-  acknowledgeNotificationsForMedicine(medicineName);
+  // Acknowledge related notifications if stock > 0
+  if (clampedQty > 0) {
+    acknowledgeNotificationsForMedicine(medicineName);
+  }
 }
 
-// Refill all medicines
-export function refillAllMedicines(): void {
+// Refill all medicines with a custom quantity
+export function refillAllMedicines(quantity: number = INITIAL_STOCK): void {
   const inventory = getInventory();
+  const clampedQty = Math.max(0, Math.min(MAX_STOCK, quantity));
+
   for (const item of inventory) {
-    item.stock = INITIAL_STOCK;
+    item.stock = clampedQty;
   }
   localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventory));
 
-  // Acknowledge all notifications
-  const notifications = getNotifications();
-  for (const n of notifications) {
-    n.acknowledged = true;
+  // Acknowledge all notifications if stock > 0
+  if (clampedQty > 0) {
+    const notifications = getNotifications();
+    for (const n of notifications) {
+      n.acknowledged = true;
+    }
+    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(notifications));
   }
-  localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(notifications));
 }
 
 // Acknowledge notifications for a specific medicine
